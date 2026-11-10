@@ -1,0 +1,31 @@
+{
+  "name": "secretsafe-mcp",
+  "version": "0.1.0",
+  "description": "Let Claude, Cursor & any MCP agent use your API keys without ever seeing them. Secrets live in Terminal 3's TEE vault (T3N), bound to your own did:t3n.",
+  "type": "module",
+  "bin": {
+    "secretsafe": "dist/cli.js"
+  },
+  "main": "dist/server.js",
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist-test/test/*.test.js",
+    "pretest": "tsc -p tsconfig.test.json",
+    "start": "node dist/cli.js serve"
+  },
+  "keywords": ["mcp", "model-context-protocol", "claude", "cursor", "secrets", "api-keys", "terminal3", "t3n", "tee", "did", "agent-security"],
+  "author": "ElTanque81",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/ElTanque81/secretsafe.git" },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@terminal3/t3n-sdk": "^5.39.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
