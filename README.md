@@ -36,8 +36,9 @@ secure_request(                  1. authenticate as your did:t3n   ────�
 git clone https://github.com/ElTanque81/secretsafe.git && cd secretsafe
 npm install && npm run build && npm link      # provides the `secretsafe` command
 
-export T3N_API_KEY=0x...                       # your T3 key
-secretsafe init                                # → your did:t3n + personal vault
+secretsafe login        # macOS: stores your T3 key in the Keychain (hidden prompt, never in a file)
+# other OS: read -s T3N_API_KEY; export T3N_API_KEY
+secretsafe init         # → your did:t3n + personal vault
 ```
 
 **3. Store a key** (value is read hidden, never as a CLI argument):
@@ -55,17 +56,19 @@ secretsafe add gemini --host generativelanguage.googleapis.com --query key
 {
   "mcpServers": {
     "secretsafe": {
-      "command": "node",
+      "command": "/usr/local/bin/node",
       "args": ["/path/to/secretsafe/dist/cli.js", "serve"],
-      "env": { "T3N_API_KEY": "0x...", "T3N_ENV": "testnet" }
+      "env": { "T3N_ENV": "testnet" }
     }
   }
 }
 ```
 
+On macOS no key goes into the config: SecretSafe reads it from the Keychain. On Linux/Windows add `"T3N_API_KEY"` to `env`.
+
 - **Claude Desktop:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Cursor:** `~/.cursor/mcp.json`
-- **Claude Code:** `claude mcp add secretsafe -e T3N_API_KEY=0x... -- node /path/to/dist/cli.js serve`
+- **Claude Code:** `claude mcp add secretsafe -- node /path/to/dist/cli.js serve`
 
 Then just ask: *"List my GitHub repos using my github secret."*
 
