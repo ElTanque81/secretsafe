@@ -7,18 +7,40 @@
     "secretsafe": "dist/cli.js"
   },
   "main": "dist/server.js",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist-test/test/*.test.js",
     "pretest": "tsc -p tsconfig.test.json",
-    "start": "node dist/cli.js serve"
+    "start": "node dist/cli.js serve",
+    "dids": "node scripts/collect-dids.mjs"
   },
-  "keywords": ["mcp", "model-context-protocol", "claude", "cursor", "secrets", "api-keys", "terminal3", "t3n", "tee", "did", "agent-security"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "cursor",
+    "secrets",
+    "api-keys",
+    "terminal3",
+    "t3n",
+    "tee",
+    "did",
+    "agent-security"
+  ],
   "author": "ElTanque81",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/ElTanque81/secretsafe.git" },
-  "engines": { "node": ">=20" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ElTanque81/secretsafe.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@terminal3/t3n-sdk": "^5.39.1",

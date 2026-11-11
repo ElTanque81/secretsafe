@@ -21,6 +21,8 @@ const en = {
   auditHeader: "Recent secret usage (local audit log, {path}):",
   mcpConfig: "Add this to your MCP client config (Claude Desktop: claude_desktop_config.json, Cursor: ~/.cursor/mcp.json):",
   needHost: "At least one --host is required.",
+  registerHint: "Optional: support the project with `secretsafe register` (shares only your public DID, nothing else).",
+  registerInfo: "Opening a pre-filled GitHub issue to register your public DID {did}. Nothing is sent until you click \"Submit\". Issues are public; no keys or secrets are included.",
   keychainPrompt: "Paste your T3 key (0x...) when asked for the password; it is stored in your macOS login Keychain, not in a file.",
   keychainSaved: "T3 key saved in the macOS Keychain (service: secretsafe-t3n). T3N_API_KEY is no longer needed.",
   keychainNote: "No key in this config: SecretSafe reads it from your macOS Keychain (run `secretsafe login` once).",
@@ -38,6 +40,7 @@ Usage:
   secretsafe remove <name>                Delete a secret from the vault
   secretsafe status                       Show your DID, vault and T3 credit balance
   secretsafe audit [--limit 20]           Show what your agents used, when, where
+  secretsafe register [--handle @you]     Opt-in: register your public DID (GitHub issue)
   secretsafe config                       Print the MCP client config snippet
   secretsafe serve                        Run the MCP server (stdio) - used by Claude/Cursor
 
@@ -64,6 +67,8 @@ const de: typeof en = {
   auditHeader: "Letzte Nutzungen (lokales Audit-Log, {path}):",
   mcpConfig: "Füge das in die Konfiguration deines MCP-Clients ein (Claude Desktop: claude_desktop_config.json, Cursor: ~/.cursor/mcp.json):",
   needHost: "Mindestens ein --host ist nötig.",
+  registerHint: "Optional: Unterstütze das Projekt mit `secretsafe register` (teilt nur deine öffentliche DID, sonst nichts).",
+  registerInfo: "Öffne ein vorausgefülltes GitHub-Issue, um deine öffentliche DID {did} zu registrieren. Es wird erst gesendet, wenn du auf \"Submit\" klickst. Issues sind öffentlich; keine Keys oder Secrets enthalten.",
   keychainPrompt: "Füge deinen T3-Key (0x...) ein, wenn nach dem Passwort gefragt wird; er wird im macOS-Schlüsselbund gespeichert, nicht in einer Datei.",
   keychainSaved: "T3-Key im macOS-Schlüsselbund gespeichert (Dienst: secretsafe-t3n). T3N_API_KEY wird nicht mehr gebraucht.",
   keychainNote: "Kein Key in dieser Konfiguration: SecretSafe liest ihn aus deinem macOS-Schlüsselbund (einmal `secretsafe login` ausführen).",
@@ -81,6 +86,7 @@ Nutzung:
   secretsafe remove <name>                Secret aus dem Tresor löschen
   secretsafe status                       DID, Tresor und T3-Guthaben anzeigen
   secretsafe audit [--limit 20]           Zeigt, was deine Agents wann wo genutzt haben
+  secretsafe register [--handle @du]      Freiwillig: öffentliche DID registrieren (GitHub-Issue)
   secretsafe config                       MCP-Konfigurations-Schnipsel ausgeben
   secretsafe serve                        MCP-Server starten (stdio) - für Claude/Cursor
 

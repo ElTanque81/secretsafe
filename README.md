@@ -2,6 +2,8 @@
 
 **Let Claude, Cursor and any MCP agent use your API keys — without ever seeing them.**
 
+▶️ **[Watch the 90-second demo](https://youtu.be/dcWbVviVK7E)**
+
 Today, giving an AI agent an API key means pasting it into a prompt, a `.env` the agent can read, or an MCP config. From there it ends up in context windows, chat logs, screenshots and prompt-injection payloads.
 
 SecretSafe stores your keys in **Terminal 3's T3 Network** (hardware-secured TEE vault), bound to **your own `did:t3n` identity**. The agent only ever sees a *name* (`openai`, `github`, `stripe`) and writes a placeholder `{{secret}}`. SecretSafe fetches the key from your vault at call time, sends it **only to the hosts you allowed**, and scrubs it from every response.
@@ -72,6 +74,14 @@ On macOS no key goes into the config: SecretSafe reads it from the Keychain. On 
 
 Then just ask: *"List my GitHub repos using my github secret."*
 
+## Support the project (opt-in)
+
+```bash
+secretsafe register --handle @you
+```
+
+Opens a pre-filled GitHub issue containing **only public identifiers** (your `did:t3n`, vault DID, network, version). Nothing is sent until you press *Submit*. It helps us show real adoption to [Terminal 3](https://x.com/terminal3io). Never paste your T3 key or any secret into an issue.
+
 ## MCP tools
 
 | Tool | What it does |
@@ -83,7 +93,7 @@ Then just ask: *"List my GitHub repos using my github secret."*
 ## CLI
 
 ```
-secretsafe init | add | list | remove | status | audit | config | serve
+secretsafe login | init | add | list | remove | status | audit | register | config | serve
 --lang en|de    --env testnet|production
 ```
 

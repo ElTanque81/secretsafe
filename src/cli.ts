@@ -113,6 +113,32 @@ async function main() {
       return;
     }
 
+    case "register": {
+      // Opt-in: opens a pre-filled public GitHub issue with ONLY public identifiers (DIDs, version).
+      const cfg = loadConfig();
+      if (!cfg?.did || !cfg.orgDid) throw new Error(t("notInitialised"));
+      const handle = one(p, "handle") ?? "";
+      const body = [
+        "<!-- SecretSafe DID registration (opt-in). Only public identifiers are included. -->",
+        `did: ${cfg.did}`,
+        `vault: ${cfg.orgDid}`,
+        `network: ${cfg.env}`,
+        `version: ${VERSION}`,
+        `client: ${process.platform}`,
+        handle ? `handle: ${handle}` : "handle: (optional, e.g. your X or GitHub handle)",
+      ].join("\n");
+      const url =
+        "https://github.com/ElTanque81/secretsafe/issues/new?" +
+        new URLSearchParams({ template: "did-registration.md", title: `DID registration: ${cfg.did.slice(-8)}`, labels: "did-registration", body }).toString();
+      out(t("registerInfo", { did: cfg.did }));
+      out(url);
+      if (one(p, "no-open") === undefined) {
+        const opener = process.platform === "darwin" ? "open" : process.platform === "win32" ? "explorer" : "xdg-open";
+        spawnSync(opener, [url], { stdio: "ignore" });
+      }
+      return;
+    }
+
     case "init": {
       const env = envOf(p);
       err(t("connecting", { env }));
@@ -124,6 +150,7 @@ async function main() {
       saveConfig({ env, did: vault.did, orgDid: vault.orgDid });
       out(created ? t("vaultReady", { org: vault.orgDid }) : t("vaultExists", { org: vault.orgDid }));
       out(t("initDone"));
+      out(t("registerHint"));
       return;
     }
 
