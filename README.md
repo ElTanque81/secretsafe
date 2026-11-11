@@ -74,6 +74,10 @@ On macOS no key goes into the config: SecretSafe reads it from the Keychain. On 
 
 Then just ask: *"List my GitHub repos using my github secret."*
 
+## Agent skill
+
+[`skills/secretsafe/SKILL.md`](skills/secretsafe/SKILL.md) teaches any SKILL.md-compatible agent (Claude Code, Cursor, Codex CLI, …) when to use SecretSafe: never ask for keys in chat, use `list_secrets` / `secure_request`, and guide the user through setup if it isn't installed. Copy the `skills/secretsafe` folder into your agent's skills directory (e.g. `~/.claude/skills/`).
+
 ## Support the project (opt-in)
 
 ```bash
