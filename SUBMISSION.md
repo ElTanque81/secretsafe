@@ -14,7 +14,7 @@ SecretSafe is an MCP server backed by the T3 Network:
 
 ## Terminal 3 integration
 - `@terminal3/t3n-sdk`: `T3nClient` handshake + ETH auth (`did:t3n`), `createOrganisation`, `SessionOrgDataClient.secretWrite/secretGet/secretList/secretDelete` (reader/manager ACL = user DID), `getBalance`.
-- Trust manifest verification via `fetchTrustedManifest`.
+- Enclave attestation pinning via `resolveTrustAnchor` (operator-signed trust manifest).
 
 ## Traction
 - Unique DIDs: _fill in_

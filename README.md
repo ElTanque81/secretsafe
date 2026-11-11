@@ -87,8 +87,6 @@ secretsafe init | add | list | remove | status | audit | config | serve
 --lang en|de    --env testnet|production
 ```
 
-The CLI speaks **English and German** (`--lang de` or `SECRETSAFE_LANG=de`).
-
 ## Security model — what is and isn't protected
 
 **Protected:**
@@ -121,8 +119,6 @@ Built with [`@terminal3/t3n-sdk`](https://www.npmjs.com/package/@terminal3/t3n-s
 
 ---
 
-### 🇩🇪 Kurz auf Deutsch
-
-SecretSafe lässt Claude, Cursor & Co. deine API-Keys benutzen, **ohne dass der Agent sie je sieht**. Die Keys liegen im TEE-Tresor von Terminal 3, gebunden an deine eigene `did:t3n`. Der Agent schreibt nur `{{secret}}`. SecretSafe setzt den Key ein, schickt ihn ausschließlich an freigegebene Hosts und schwärzt ihn in jeder Antwort. Start: `secretsafe init --lang de`.
+🌍 The CLI is available in **English and German** (`--lang de` or `SECRETSAFE_LANG=de`).
 
 MIT License
