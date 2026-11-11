@@ -21,6 +21,11 @@ const en = {
   auditHeader: "Recent secret usage (local audit log, {path}):",
   mcpConfig: "Add this to your MCP client config (Claude Desktop: claude_desktop_config.json, Cursor: ~/.cursor/mcp.json):",
   needHost: "At least one --host is required.",
+  scanNone: "No secrets found in {root}.",
+  scanHeader: "Found {n} possible secret(s) in {root}. Values are never shown, only a public prefix and a fingerprint:",
+  scanFooter: "Review each finding, then run the suggested import command (adjust name/host if needed). After importing: remove the value from the file and rotate any key that was ever committed or shared.",
+  imported: "Imported \"{name}\" from {file}:{line} (fp:{fp}) into your T3N vault. Allowed hosts: {hosts}",
+  importNext: "Next: delete the value from {file}:{line} (replace it with a reference to SecretSafe or an env var) and rotate the key if it was ever committed.",
   registerHint: "Optional: support the project with `secretsafe register` (shares only your public DID, nothing else).",
   registerInfo: "Opening a pre-filled GitHub issue to register your public DID {did}. Nothing is sent until you click \"Submit\". Issues are public; no keys or secrets are included.",
   keychainPrompt: "Paste your T3 key (0x...) when asked for the password; it is stored in your macOS login Keychain, not in a file.",
@@ -36,6 +41,9 @@ Usage:
   secretsafe add <name> --host <host> [--host <host2>]
              [--header "Authorization: Bearer {{secret}}"] [--query key] [--note "..."]
                                           Store a secret (value is read hidden from stdin)
+  secretsafe scan [path] [--json]         Find hard-coded keys (masked, never printed)
+  secretsafe import <name> --file <f> --fp <fp> --host <host> [...]
+                                          Move a found key straight from the file into the vault
   secretsafe list                         List secret names + allowed hosts
   secretsafe remove <name>                Delete a secret from the vault
   secretsafe status                       Show your DID, vault and T3 credit balance
@@ -67,6 +75,11 @@ const de: typeof en = {
   auditHeader: "Letzte Nutzungen (lokales Audit-Log, {path}):",
   mcpConfig: "Füge das in die Konfiguration deines MCP-Clients ein (Claude Desktop: claude_desktop_config.json, Cursor: ~/.cursor/mcp.json):",
   needHost: "Mindestens ein --host ist nötig.",
+  scanNone: "Keine Secrets in {root} gefunden.",
+  scanHeader: "{n} mögliche(s) Secret(s) in {root} gefunden. Werte werden nie angezeigt, nur ein öffentlicher Präfix und ein Fingerabdruck:",
+  scanFooter: "Prüfe jeden Fund und führe dann den vorgeschlagenen import-Befehl aus (Name/Host ggf. anpassen). Danach: Wert aus der Datei entfernen und jeden Key erneuern, der je committet oder geteilt wurde.",
+  imported: "\"{name}\" aus {file}:{line} (fp:{fp}) in deinen T3N-Tresor importiert. Erlaubte Hosts: {hosts}",
+  importNext: "Als Nächstes: Wert aus {file}:{line} löschen (durch Verweis auf SecretSafe oder eine Env-Variable ersetzen) und den Key erneuern, falls er je committet wurde.",
   registerHint: "Optional: Unterstütze das Projekt mit `secretsafe register` (teilt nur deine öffentliche DID, sonst nichts).",
   registerInfo: "Öffne ein vorausgefülltes GitHub-Issue, um deine öffentliche DID {did} zu registrieren. Es wird erst gesendet, wenn du auf \"Submit\" klickst. Issues sind öffentlich; keine Keys oder Secrets enthalten.",
   keychainPrompt: "Füge deinen T3-Key (0x...) ein, wenn nach dem Passwort gefragt wird; er wird im macOS-Schlüsselbund gespeichert, nicht in einer Datei.",
@@ -82,6 +95,9 @@ Nutzung:
   secretsafe add <name> --host <host> [--host <host2>]
              [--header "Authorization: Bearer {{secret}}"] [--query key] [--note "..."]
                                           Secret speichern (Wert wird unsichtbar eingelesen)
+  secretsafe scan [pfad] [--json]         Fest eingetragene Keys finden (maskiert, nie angezeigt)
+  secretsafe import <name> --file <f> --fp <fp> --host <host> [...]
+                                          Gefundenen Key direkt aus der Datei in den Tresor schieben
   secretsafe list                         Secret-Namen + erlaubte Hosts anzeigen
   secretsafe remove <name>                Secret aus dem Tresor löschen
   secretsafe status                       DID, Tresor und T3-Guthaben anzeigen

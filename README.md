@@ -74,9 +74,21 @@ On macOS no key goes into the config: SecretSafe reads it from the Keychain. On 
 
 Then just ask: *"List my GitHub repos using my github secret."*
 
-## Agent skill
+## Find & migrate hard-coded keys (blind)
 
-[`skills/secretsafe/SKILL.md`](skills/secretsafe/SKILL.md) teaches any SKILL.md-compatible agent (Claude Code, Cursor, Codex CLI, …) when to use SecretSafe: never ask for keys in chat, use `list_secrets` / `secure_request`, and guide the user through setup if it isn't installed. Copy the `skills/secretsafe` folder into your agent's skills directory (e.g. `~/.claude/skills/`).
+```bash
+secretsafe scan .            # finds keys in .env, config & code: masked preview + fingerprint, never the value
+secretsafe import openai --file .env --fp 00664cde70fa --host api.openai.com --header "Authorization: Bearer {{secret}}"
+```
+
+`import` reads the value straight from the file by fingerprint and stores it in your T3N vault, so the key never appears in your terminal, shell history or your agent's context. Detects OpenAI, Anthropic, GitHub, Stripe, Google/Gemini, Slack, Hugging Face, Groq, SendGrid, Resend, AWS, private keys and generic `*_API_KEY / *_TOKEN / *_SECRET` assignments.
+
+## Agent skills
+
+- [`skills/secretsafe`](skills/secretsafe/SKILL.md) teaches any SKILL.md-compatible agent (Claude Code, Cursor, Codex CLI, …) when to use SecretSafe: never ask for keys in chat, use `list_secrets` / `secure_request`, and guide the user through setup if it isn't installed. 
+- [`skills/secretsafe-migrate`](skills/secretsafe-migrate/SKILL.md): "find all API keys in this repo and secure them". The agent scans, shows a plan, imports by fingerprint, cleans the files, fixes `.gitignore` and tells you which leaked keys to rotate, without ever seeing a key.
+
+Copy the folders into your agent's skills directory (e.g. `~/.claude/skills/`).
 
 ## Support the project (opt-in)
 
@@ -97,7 +109,7 @@ Opens a pre-filled GitHub issue containing **only public identifiers** (your `di
 ## CLI
 
 ```
-secretsafe login | init | add | list | remove | status | audit | register | config | serve
+secretsafe login | init | add | scan | import | list | remove | status | audit | register | config | serve
 --lang en|de    --env testnet|production
 ```
 

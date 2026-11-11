@@ -11,6 +11,8 @@ import { loadConfig, saveConfig, readAudit, auditPath } from "./config.js";
 import { normaliseName, validatePolicy } from "./inject.js";
 import { T3Vault } from "./vault.js";
 import { createServer, VERSION } from "./server.js";
+import { scanPath, extractValue } from "./scan.js";
+import { resolve, relative, join } from "node:path";
 
 interface Parsed {
   cmd: string;
@@ -163,6 +165,46 @@ async function main() {
       const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note") });
       await vault.put(name, policy);
       out(t("added", { name, hosts: policy.hosts.join(", ") }));
+      return;
+    }
+
+    case "scan": {
+      // Never prints secret values: only public prefixes, length and a fingerprint.
+      const root = resolve(p.pos[0] ?? ".");
+      const findings = scanPath(root);
+      if (one(p, "json") !== undefined) {
+        out(JSON.stringify({ root, count: findings.length, findings }, null, 2));
+        return;
+      }
+      if (findings.length === 0) return out(t("scanNone", { root }));
+      out(t("scanHeader", { n: findings.length, root }));
+      for (const f of findings) {
+        out(`\n  ${f.file}:${f.line}  ${f.label}${f.variable ? `  (${f.variable})` : ""}`);
+        out(`    ${f.preview}   fp:${f.fp}`);
+        if (f.note) out(`    ⚠ ${f.note}`);
+        else {
+          const inj = f.header ? ` --header "${f.header}"` : f.query ? ` --query ${f.query}` : ` --header "Authorization: Bearer {{secret}}"`;
+          const rel = relative(process.cwd(), join(root, f.file)) || f.file;
+          out(`    → secretsafe import ${f.suggestedName} --file ${JSON.stringify(rel)} --fp ${f.fp} --host ${f.host ?? "<api.host.com>"}${inj}`);
+        }
+      }
+      out("\n" + t("scanFooter"));
+      return;
+    }
+
+    case "import": {
+      // Moves a secret straight from a file into the T3N vault. The value never reaches stdout or argv.
+      const name = normaliseName(p.pos[0] ?? "");
+      const file = one(p, "file");
+      if (!file) throw new Error("--file is required");
+      const hosts = p.flags.host ?? [];
+      if (hosts.length === 0) throw new Error(t("needHost"));
+      const { value, finding } = extractValue(resolve(file), { fp: one(p, "fp"), variable: one(p, "var") });
+      const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note") ?? `imported from ${file}:${finding.line}` });
+      const vault = await openVault(p, log);
+      await vault.put(name, policy);
+      out(t("imported", { name, file, line: finding.line, fp: finding.fp, hosts: policy.hosts.join(", ") }));
+      out(t("importNext", { file, line: finding.line }));
       return;
     }
 

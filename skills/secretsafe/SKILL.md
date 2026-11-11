@@ -83,6 +83,10 @@ secretsafe add <name> --host <api.host.com> --header "Authorization: Bearer {{se
 
 Pick the right injection for the API: `--header "x-api-key: {{secret}}"` for header keys, `--query key` for query-parameter keys. Then retry with `list_secrets`.
 
+### Keys already sitting in files
+
+If the project contains hard-coded keys or `.env` files, do not read them. Use the `secretsafe-migrate` skill: `secretsafe scan` finds keys without printing them and `secretsafe import` moves them into the vault by fingerprint.
+
 ### Adding a host
 
 A denied host means the user never allowed it. Only the user can change that, by re-adding the secret with the extra host:
