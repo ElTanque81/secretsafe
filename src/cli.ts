@@ -11,7 +11,7 @@ import { loadConfig, saveConfig, readAudit, auditPath } from "./config.js";
 import { normaliseName, validatePolicy } from "./inject.js";
 import { T3Vault } from "./vault.js";
 import { createServer, VERSION } from "./server.js";
-import { scanPath, extractValue } from "./scan.js";
+import { scanPath, extractValue, looksLikeWalletSecret, WALLET_DETECTORS } from "./scan.js";
 import { resolve, relative, join } from "node:path";
 
 interface Parsed {
@@ -160,8 +160,10 @@ async function main() {
       const name = normaliseName(p.pos[0] ?? "");
       const hosts = p.flags.host ?? [];
       if (hosts.length === 0) throw new Error(t("needHost"));
-      const vault = await openVault(p, log);
       const value = await readHidden(t("enterValue", { name }));
+      const w = looksLikeWalletSecret(value);
+      if (w && !(w === "evm-private-key" && one(p, "not-a-wallet-key") !== undefined)) throw new Error(t("walletRefused", { kind: w }));
+      const vault = await openVault(p, log);
       const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note") });
       await vault.put(name, policy);
       out(t("added", { name, hosts: policy.hosts.join(", ") }));
@@ -200,6 +202,9 @@ async function main() {
       const hosts = p.flags.host ?? [];
       if (hosts.length === 0) throw new Error(t("needHost"));
       const { value, finding } = extractValue(resolve(file), { fp: one(p, "fp"), variable: one(p, "var") });
+      if (WALLET_DETECTORS.has(finding.detector) || (looksLikeWalletSecret(value) && one(p, "not-a-wallet-key") === undefined)) {
+        throw new Error(t("walletRefused", { kind: finding.detector }));
+      }
       const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note") ?? `imported from ${file}:${finding.line}` });
       const vault = await openVault(p, log);
       await vault.put(name, policy);
@@ -212,6 +217,15 @@ async function main() {
     case "ls": {
       const vault = await openVault(p, log);
       const items = await vault.list();
+      if (one(p, "json") !== undefined) {
+        const rows = [];
+        for (const it of items) {
+          const pol = await vault.get(it.name);
+          rows.push({ name: it.name, version: it.version, updatedAt: it.updatedAt, hosts: pol.hosts, injection: pol.header ? `header ${pol.header.split(":")[0]}` : pol.query ? `query ${pol.query}` : "placeholder", note: pol.note ?? "" });
+        }
+        out(JSON.stringify({ did: vault.did, vault: vault.orgDid, secrets: rows }, null, 2));
+        return;
+      }
       if (items.length === 0) return out(t("noSecrets"));
       out(t("listHeader"));
       for (const it of items) {
@@ -239,7 +253,19 @@ async function main() {
     }
 
     case "audit": {
-      const rows = readAudit(Number(one(p, "limit") ?? 20));
+      let rows = readAudit(Number(one(p, "limit") ?? 20));
+      const sec = one(p, "secret");
+      const since = one(p, "since");
+      if (sec) rows = rows.filter((r) => r.secret === sec);
+      if (since) {
+        const m = since.match(/^(\d+)([hd])$/);
+        const cutoff = m ? Date.now() - Number(m[1]) * (m[2] === "h" ? 3_600_000 : 86_400_000) : Date.parse(since);
+        if (!Number.isNaN(cutoff)) rows = rows.filter((r) => Date.parse(r.ts) >= cutoff);
+      }
+      if (one(p, "json") !== undefined) {
+        out(JSON.stringify({ path: auditPath(), count: rows.length, entries: rows }, null, 2));
+        return;
+      }
       if (rows.length === 0) return out(t("auditEmpty"));
       out(t("auditHeader", { path: auditPath() }));
       for (const r of rows) {

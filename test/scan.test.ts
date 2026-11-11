@@ -47,3 +47,42 @@ test("scanPath skips node_modules and strips values; extractValue picks by finge
   assert.equal(extractValue(join(dir, ".env"), { variable: "OPENAI_API_KEY" }).value, OPENAI);
   assert.throws(() => extractValue(join(dir, ".env"), { fp: "000000000000" }));
 });
+
+import { looksLikeWalletSecret } from "../src/scan.js";
+
+const EVM = "0x4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
+const ANVIL0 = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+const SOL = "5MaiiCavjCmn9Hs1o3eznqDEhRwxo7pXiAYez7keQUviUkauRiTMD8DrESdrNjN8zd9mTmVhRvBJeRuhTCD6gjsu"; // 88 chars base58 (dummy)
+const SEED = "abandon ability able about above absent absorb abstract absurd abuse access accident";
+
+test("wallet secrets are detected and masked", () => {
+  const txt = [
+    `PRIVATE_KEY=${EVM}`,
+    `deployer: { accounts: ["${ANVIL0}"] }`,
+    `SOLANA_SECRET_KEY=${SOL}`,
+    `MNEMONIC="${SEED}"`,
+    `[${Array.from({ length: 64 }, (_, i) => (i * 7) % 256).join(",")}]`,
+    `const TX_HASH = "${EVM}";`, // no wallet-ish name -> still flagged? TX_HASH has no key word
+  ].join("\n");
+  const f = scanText(txt, "x");
+  const ids = f.map((x) => `${x.line}:${x.detector}`);
+  assert.ok(ids.includes("1:evm-private-key"));
+  assert.ok(ids.includes("2:evm-private-key"));
+  assert.ok(ids.includes("3:solana-private-key"));
+  assert.ok(ids.includes("4:seed-phrase"));
+  assert.ok(ids.includes("5:solana-private-key"));
+  assert.ok(!ids.some((x) => x.startsWith("6:")), "plain tx hash line without key-ish name is not flagged");
+  const anvil = f.find((x) => x.line === 2)!;
+  assert.match(anvil.label, /Anvil\/Hardhat/);
+  for (const x of f) {
+    assert.ok(x.note, "wallet findings carry a warning note");
+    assert.ok(!x.preview.includes(x.value.slice(-10)));
+  }
+});
+
+test("looksLikeWalletSecret", () => {
+  assert.equal(looksLikeWalletSecret(EVM), "evm-private-key");
+  assert.equal(looksLikeWalletSecret(SOL), "solana-private-key");
+  assert.equal(looksLikeWalletSecret(SEED), "seed-phrase");
+  assert.equal(looksLikeWalletSecret("sk-proj-abc123def456ghi789jkl012mno345"), null);
+});

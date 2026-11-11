@@ -3,6 +3,7 @@
 **Let Claude, Cursor and any MCP agent use your API keys — without ever seeing them.**
 
 ▶️ **[Watch the 90-second demo](https://youtu.be/dcWbVviVK7E)**
+🧩 **[Get the agent skill on Agensi](https://www.agensi.io/skills/secretsafe-use-api-keys-without-seeing-them)** (free)
 
 Today, giving an AI agent an API key means pasting it into a prompt, a `.env` the agent can read, or an MCP config. From there it ends up in context windows, chat logs, screenshots and prompt-injection payloads.
 
@@ -83,12 +84,14 @@ secretsafe import openai --file .env --fp 00664cde70fa --host api.openai.com --h
 
 `import` reads the value straight from the file by fingerprint and stores it in your T3N vault, so the key never appears in your terminal, shell history or your agent's context. Detects OpenAI, Anthropic, GitHub, Stripe, Google/Gemini, Slack, Hugging Face, Groq, SendGrid, Resend, AWS, private keys and generic `*_API_KEY / *_TOKEN / *_SECRET` assignments.
 
+**Wallet keys:** `scan` also flags EVM and Solana private keys, seed phrases and the public Anvil/Hardhat test keys, a common cause of drained wallets. These are reported, never imported: SecretSafe sends stored secrets to API servers, so `add` and `import` refuse anything that looks like a wallet secret.
+
 ## Agent skills
 
 - [`skills/secretsafe`](skills/secretsafe/SKILL.md) teaches any SKILL.md-compatible agent (Claude Code, Cursor, Codex CLI, …) when to use SecretSafe: never ask for keys in chat, use `list_secrets` / `secure_request`, and guide the user through setup if it isn't installed. 
 - [`skills/secretsafe-migrate`](skills/secretsafe-migrate/SKILL.md): "find all API keys in this repo and secure them". The agent scans, shows a plan, imports by fingerprint, cleans the files, fixes `.gitignore` and tells you which leaked keys to rotate, without ever seeing a key.
 
-Copy the folders into your agent's skills directory (e.g. `~/.claude/skills/`).
+Copy the folders into your agent's skills directory (e.g. `~/.claude/skills/`). Or install the main skill with one click from [Agensi](https://www.agensi.io/skills/secretsafe-use-api-keys-without-seeing-them).
 
 ## Support the project (opt-in)
 

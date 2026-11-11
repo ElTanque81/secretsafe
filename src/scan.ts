@@ -40,6 +40,31 @@ export const DETECTORS: Detector[] = [
 /** Generic `NAME=value` / `NAME: "value"` assignments whose name looks secret, for keys without a known prefix. */
 const GENERIC_ASSIGN = /(?:^|[\s,{;(])["']?([A-Z0-9_]*(?:API_?KEY|TOKEN|SECRET|ACCESS_KEY|AUTH)[A-Z0-9_]*)["']?\s*[:=]\s*["']?([^\s"'`,;#]{16,})/gim;
 
+/** Wallet secrets. These must NEVER be injected into HTTP requests; scan only reports them. */
+export const WALLET_DETECTORS = new Set(["evm-private-key", "solana-private-key", "seed-phrase"]);
+export const WALLET_NOTE =
+  "Wallet secret: do NOT import it into SecretSafe (it would be sent to a server). Treat it as compromised if this file was ever committed or shared: move the funds to a new wallet, then delete the value. Keep wallet keys in a hardware wallet or encrypted keystore.";
+const WALLET_NAME = /(PRIV|PRIVATE|WALLET|SIGNER|DEPLOYER|OWNER|ACCOUNT|MNEMONIC|SEED|PHRASE|SECRET|KEY)/i;
+const EVM_KEY = /(?<![0-9a-fA-Fx])((?:0x)?[0-9a-fA-F]{64})(?![0-9a-fA-F])/g;
+const SOL_B58 = /(?<![1-9A-HJ-NP-Za-km-z])([1-9A-HJ-NP-Za-km-z]{86,88})(?![1-9A-HJ-NP-Za-km-z])/g;
+const SOL_ARRAY = /\[\s*(?:\d{1,3}\s*,\s*){63}\d{1,3}\s*\]/g;
+const MNEMONIC_ASSIGN = /([A-Za-z0-9_]*(?:MNEMONIC|SEED|PHRASE|RECOVERY)[A-Za-z0-9_]*)["']?\s*[:=]\s*["'`]((?:[a-z]{3,8}\s+){11,23}[a-z]{3,8})["'`]/gi;
+/** Publicly known dev-chain keys (Anvil/Hardhat accounts #0 and #1). Fine for local tests, fatal on mainnet. */
+const KNOWN_TEST_KEYS = new Set([
+  "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+  "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
+]);
+
+/** True if a value looks like a wallet private key or seed phrase. */
+export function looksLikeWalletSecret(v: string): "evm-private-key" | "solana-private-key" | "seed-phrase" | null {
+  const t = v.trim();
+  if (/^(0x)?[0-9a-fA-F]{64}$/.test(t)) return "evm-private-key";
+  if (/^[1-9A-HJ-NP-Za-km-z]{86,88}$/.test(t)) return "solana-private-key";
+  if (/^\[\s*(\d{1,3}\s*,\s*){63}\d{1,3}\s*\]$/.test(t)) return "solana-private-key";
+  if (/^([a-z]{3,8}\s+){11,23}[a-z]{3,8}$/.test(t)) return "seed-phrase";
+  return null;
+}
+
 export interface Finding {
   file: string; // relative path
   line: number;
@@ -119,6 +144,43 @@ export function scanText(text: string, file: string): (Finding & { value: string
         });
       }
     }
+    // --- wallet secrets (report only, never importable) ---
+    const pushWallet = (detector: string, label: string, value: string, idx: number, preview: string, note = WALLET_NOTE) => {
+      const key = `${i}:${value}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const variable = varNameAt(lineText, idx);
+      out.push({ file, line: i + 1, detector, label, variable, preview, length: value.length, fp: fingerprint(value), suggestedName: detector, note, value });
+    };
+    if (WALLET_NAME.test(lineText) || /accounts\s*:/i.test(lineText)) {
+      EVM_KEY.lastIndex = 0;
+      let e: RegExpExecArray | null;
+      while ((e = EVM_KEY.exec(lineText))) {
+        const v = e[1];
+        const bare = v.replace(/^0x/, "").toLowerCase();
+        if (/^(.)\1+$/.test(bare)) continue;
+        const known = KNOWN_TEST_KEYS.has(bare);
+        pushWallet("evm-private-key", known ? "Well-known dev-chain private key (Anvil/Hardhat)" : "EVM wallet private key", v, e.index,
+          `${v.startsWith("0x") ? "0x" : ""}${"•".repeat(6)} (64 hex)`,
+          known ? "Public Anvil/Hardhat test key: fine on a local chain, but anyone can drain it on mainnet or testnets. Never fund it." : WALLET_NOTE);
+      }
+      SOL_B58.lastIndex = 0;
+      while ((e = SOL_B58.exec(lineText))) pushWallet("solana-private-key", "Solana wallet private key (base58)", e[1], e.index, `${"•".repeat(6)} (${e[1].length} chars)`);
+    }
+    SOL_ARRAY.lastIndex = 0;
+    let sa: RegExpExecArray | null;
+    while ((sa = SOL_ARRAY.exec(lineText))) {
+      const nums = sa[0].match(/\d+/g)!.map(Number);
+      if (nums.every((n) => n <= 255)) pushWallet("solana-private-key", "Solana keypair (64-byte array)", sa[0], sa.index, "[•••, … 64 bytes]");
+    }
+    MNEMONIC_ASSIGN.lastIndex = 0;
+    let mn: RegExpExecArray | null;
+    while ((mn = MNEMONIC_ASSIGN.exec(lineText))) {
+      const words = mn[2].trim().split(/\s+/).length;
+      if (![12, 15, 18, 21, 24].includes(words)) continue;
+      pushWallet("seed-phrase", "Wallet seed phrase (mnemonic)", mn[2], mn.index + mn[0].indexOf(mn[2]), `${words} words •••`);
+    }
+
     GENERIC_ASSIGN.lastIndex = 0;
     let g: RegExpExecArray | null;
     while ((g = GENERIC_ASSIGN.exec(lineText))) {

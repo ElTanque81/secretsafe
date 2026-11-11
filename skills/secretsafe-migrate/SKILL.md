@@ -25,7 +25,7 @@ secretsafe scan . --json
 ```
 Run from the project root (or pass a path). Each finding has `file`, `line`, `label`, `variable`, `preview`, `length`, `fp`, `suggestedName`, `host`, `header` / `query`, and optional `note`.
 
-The scanner skips `node_modules`, `.git`, `dist`, build folders, binaries and files over 1 MB. It knows OpenAI, Anthropic, GitHub, Stripe, Google/Gemini, Slack, Hugging Face, Groq, SendGrid, Resend, AWS and private-key blocks, plus generic `*_API_KEY / *_TOKEN / *_SECRET = …` assignments.
+The scanner skips `node_modules`, `.git`, `dist`, build folders, binaries and files over 1 MB. It knows OpenAI, Anthropic, GitHub, Stripe, Google/Gemini, Slack, Hugging Face, Groq, SendGrid, Resend, AWS, private-key blocks, wallet private keys (EVM, Solana), seed phrases and the public Anvil/Hardhat test keys, plus generic `*_API_KEY / *_TOKEN / *_SECRET = …` assignments.
 
 ### 2. Check what was ever committed (no values involved)
 ```bash
@@ -46,6 +46,7 @@ Show a table like this:
 - Use the suggested host/injection unless the user knows better (e.g. a proxy or EU endpoint).
 - Generic findings (`detector: "generic"`) have no known host: **ask the user** for the API host. Never guess.
 - Findings with a `note` (AWS, private keys) cannot be injected by SecretSafe: report them and recommend rotating them and moving them to a proper secret store for that platform.
+- **Wallet secrets** (`evm-private-key`, `solana-private-key`, `seed-phrase`) must **never** be imported: SecretSafe sends stored secrets to API servers, and `import` refuses them anyway. If the file was ever committed, shared or synced, tell the user the wallet is compromised and that the only fix is to **move the funds to a new wallet** (created in a hardware wallet or a proper wallet app), then delete the value from the file. A finding labelled *Anvil/Hardhat* is a public test key: fine on a local chain, never fund it on a real network.
 - Possible false positives: let the user drop rows.
 
 ### 4. Import (only after "yes")
