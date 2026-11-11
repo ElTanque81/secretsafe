@@ -8,7 +8,7 @@ import { userInfo } from "node:os";
 import type { Environment } from "@terminal3/t3n-sdk";
 import { t, setLang } from "./i18n.js";
 import { loadConfig, saveConfig, readAudit, auditPath } from "./config.js";
-import { normaliseName, validatePolicy } from "./inject.js";
+import { normaliseName, validatePolicy, READ_ONLY_RULES } from "./inject.js";
 import { T3Vault } from "./vault.js";
 import { createServer, VERSION } from "./server.js";
 import { scanPath, extractValue, looksLikeWalletSecret, WALLET_DETECTORS } from "./scan.js";
@@ -35,6 +35,12 @@ function parse(argv: string[]): Parsed {
 }
 
 const one = (p: Parsed, k: string) => p.flags[k]?.[p.flags[k].length - 1];
+/** --allow "GET /repos/**" (repeatable) and/or --read-only (= GET|HEAD on any path). */
+const allowRules = (p: Parsed): string[] | undefined => {
+  const rules = [...(p.flags.allow ?? [])];
+  if (one(p, "read-only") !== undefined) rules.push(...READ_ONLY_RULES);
+  return rules.length ? rules : undefined;
+};
 const err = (s: string) => process.stderr.write(s + "\n");
 const out = (s: string) => process.stdout.write(s + "\n");
 
@@ -164,9 +170,10 @@ async function main() {
       const w = looksLikeWalletSecret(value);
       if (w && !(w === "evm-private-key" && one(p, "not-a-wallet-key") !== undefined)) throw new Error(t("walletRefused", { kind: w }));
       const vault = await openVault(p, log);
-      const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note") });
+      const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note"), allow: allowRules(p) });
       await vault.put(name, policy);
       out(t("added", { name, hosts: policy.hosts.join(", ") }));
+      if (policy.allow) out(t("allowedRules", { rules: policy.allow.join(", ") }));
       return;
     }
 
@@ -205,7 +212,7 @@ async function main() {
       if (WALLET_DETECTORS.has(finding.detector) || (looksLikeWalletSecret(value) && one(p, "not-a-wallet-key") === undefined)) {
         throw new Error(t("walletRefused", { kind: finding.detector }));
       }
-      const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note") ?? `imported from ${file}:${finding.line}` });
+      const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note") ?? `imported from ${file}:${finding.line}`, allow: allowRules(p) });
       const vault = await openVault(p, log);
       await vault.put(name, policy);
       out(t("imported", { name, file, line: finding.line, fp: finding.fp, hosts: policy.hosts.join(", ") }));
@@ -221,7 +228,7 @@ async function main() {
         const rows = [];
         for (const it of items) {
           const pol = await vault.get(it.name);
-          rows.push({ name: it.name, version: it.version, updatedAt: it.updatedAt, hosts: pol.hosts, injection: pol.header ? `header ${pol.header.split(":")[0]}` : pol.query ? `query ${pol.query}` : "placeholder", note: pol.note ?? "" });
+          rows.push({ name: it.name, version: it.version, updatedAt: it.updatedAt, hosts: pol.hosts, allow: pol.allow ?? ["* /**"], injection: pol.header ? `header ${pol.header.split(":")[0]}` : pol.query ? `query ${pol.query}` : "placeholder", note: pol.note ?? "" });
         }
         out(JSON.stringify({ did: vault.did, vault: vault.orgDid, secrets: rows }, null, 2));
         return;
@@ -230,7 +237,7 @@ async function main() {
       out(t("listHeader"));
       for (const it of items) {
         const pol = await vault.get(it.name);
-        out(`  • ${it.name.padEnd(20)} → ${pol.hosts.join(", ")}${pol.note ? `   (${pol.note})` : ""}`);
+        out(`  • ${it.name.padEnd(20)} → ${pol.hosts.join(", ")}${pol.allow ? `  [${pol.allow.join(", ")}]` : ""}${pol.note ? `   (${pol.note})` : ""}`);
       }
       return;
     }

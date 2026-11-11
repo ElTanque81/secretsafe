@@ -110,7 +110,7 @@ export function createServer(deps: SecureRequestDeps): McpServer {
     {
       title: "List available secrets",
       description:
-        "List the API keys/tokens the user has stored in SecretSafe (Terminal 3 TEE vault). Returns only names, allowed hosts and the default injection. Values are never returned. Call this first to know which secret name to use with secure_request.",
+        "List the API keys/tokens the user has stored in SecretSafe (Terminal 3 TEE vault). Returns only names, allowed hosts, allowed methods/paths and the default injection. Values are never returned. Call this first to know which secret name to use with secure_request.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
@@ -123,6 +123,7 @@ export function createServer(deps: SecureRequestDeps): McpServer {
           out.push({
             name: it.name,
             allowed_hosts: p.hosts,
+            allowed_requests: p.allow ?? ["any method, any path"],
             default_injection: p.header ? `header ${p.header.split(":")[0]}` : p.query ? `query ${p.query}` : `none (use ${PLACEHOLDER})`,
             note: p.note ?? "",
           });
@@ -142,7 +143,7 @@ export function createServer(deps: SecureRequestDeps): McpServer {
         "Make an HTTPS request that needs one of the user's secrets WITHOUT seeing it.",
         `Write the literal placeholder ${PLACEHOLDER} where the secret belongs (a header value, a query value or the body).`,
         "If you omit the placeholder, the secret's default header/query injection is used (e.g. Authorization: Bearer).",
-        "The request is only sent if the URL host is on that secret's allow-list. Any echo of the secret in the response is replaced with [REDACTED:<name>].",
+        "The request is only sent if the URL host is on that secret's allow-list and, if the secret has method/path rules (allowed_requests in list_secrets), the method and path match one of them. Any echo of the secret in the response is replaced with [REDACTED:<name>].",
         "Never ask the user to paste the key into the chat; use this tool instead.",
       ].join(" "),
       inputSchema: {

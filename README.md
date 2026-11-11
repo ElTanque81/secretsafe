@@ -50,6 +50,10 @@ secretsafe init         # → your did:t3n + personal vault
 secretsafe add openai --host api.openai.com --header "Authorization: Bearer {{secret}}" --note "personal"
 secretsafe add github --host api.github.com --header "Authorization: Bearer {{secret}}"
 secretsafe add gemini --host generativelanguage.googleapis.com --query key
+# least privilege: read-only GitHub, whatever scopes the token has
+secretsafe add github-ro --host api.github.com --header "Authorization: Bearer {{secret}}" \
+  --allow "GET|HEAD /user" --allow "GET /user/repos" --allow "GET /repos/**"
+# shortcut for any GET/HEAD: --read-only
 # or pipe it:  pbpaste | secretsafe add stripe --host api.stripe.com --header "Authorization: Bearer {{secret}}"
 ```
 
@@ -121,13 +125,14 @@ secretsafe login | init | add | scan | import | list | remove | status | audit |
 **Protected:**
 - The key is stored encrypted in T3N, readable only by your `did:t3n` (reader/manager ACL = your DID).
 - The key **never enters the agent's context**: tools return names and redacted responses only.
+- **Least privilege per request:** optional method/path rules per secret, e.g. `--allow "GET /repos/**"` or `--read-only`. Even if the stored token can write, the agent can only make the requests you allowed.
 - **Exfiltration control:** exact-host allow-list per secret, https only, port 443 only, no userinfo, redirects never followed, placeholder forbidden in host/path, CR/LF header injection blocked.
 - **Redaction:** raw, URL-encoded, base64 and base64url echoes of the key are replaced in body, headers and error messages. `Set-Cookie` and other sensitive response headers are dropped.
 - **Audit:** every use (ok / denied / error) is appended to `~/.secretsafe/audit.jsonl` — without the value.
 
 **Not (yet) protected:**
 - The SecretSafe process on your machine briefly holds the key in memory to make the request. Malware on your machine could read it. *Roadmap:* move the outbound call itself into a T3N TEE contract with `contract_allowlist` + agent egress, so the value never leaves the enclave.
-- An allowed host is trusted. If you allow `api.example.com`, an agent can send *that* host anything.
+- An allowed host is trusted. If you allow `api.example.com` without method/path rules, an agent can send *that* host anything. Add `--allow` rules or `--read-only` to narrow it down.
 
 ## Roadmap
 
