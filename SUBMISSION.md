@@ -23,7 +23,7 @@ SecretSafe is an MCP server backed by the T3 Network:
 
 ## Links
 - GitHub: https://github.com/ElTanque81/secretsafe
-- Demo video: _fill in_
+- Demo video: https://youtu.be/dcWbVviVK7E
 - X: _fill in_ (tagging @terminal3io)
 
 ## Roadmap
