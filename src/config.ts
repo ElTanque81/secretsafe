@@ -53,6 +53,11 @@ export interface AuditEntry {
   outcome: "ok" | "denied" | "error";
   detail?: string;
   client?: string;
+  request_id?: string;
+  tool_call_id?: string;
+  code?: string;
+  injected_into?: string[];
+  redactions?: number;
 }
 
 /** Append-only local audit log. Never contains secret values (callers pass redacted data only). */

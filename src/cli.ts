@@ -276,7 +276,8 @@ async function main() {
       if (rows.length === 0) return out(t("auditEmpty"));
       out(t("auditHeader", { path: auditPath() }));
       for (const r of rows) {
-        out(`  ${r.ts}  ${r.outcome.padEnd(6)} ${String(r.status ?? "-").padEnd(4)} ${r.secret.padEnd(14)} ${r.method} ${r.host}${r.path}${r.detail ? `  — ${r.detail}` : ""}`);
+        const extra = [r.code, r.redactions ? `redacted:${r.redactions}` : "", r.request_id ? `id:${r.request_id.slice(0, 8)}` : ""].filter(Boolean).join(" ");
+        out(`  ${r.ts}  ${r.outcome.padEnd(6)} ${String(r.status ?? "-").padEnd(4)} ${r.secret.padEnd(14)} ${r.method} ${r.host}${r.path}${extra ? `  [${extra}]` : ""}${r.detail ? `  — ${r.detail}` : ""}`);
       }
       return;
     }

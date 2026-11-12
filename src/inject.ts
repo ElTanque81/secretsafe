@@ -45,8 +45,24 @@ export interface BuiltRequest {
   injectedInto: string[];
 }
 
+/** Machine-readable refusal codes, so agents can decide to fix, retry or stop without seeing the secret. */
+export type RefusalCode =
+  | "HOST_NOT_ALLOWED"
+  | "RULE_NOT_ALLOWED"
+  | "METHOD_NOT_ALLOWED"
+  | "INVALID_URL"
+  | "HTTPS_REQUIRED"
+  | "PORT_NOT_ALLOWED"
+  | "CREDENTIALS_IN_URL"
+  | "PLACEHOLDER_POSITION"
+  | "ENCODED_SLASH"
+  | "INVALID_HEADER"
+  | "BODY_NOT_ALLOWED"
+  | "NO_INJECTION_TARGET"
+  | "INVALID_POLICY";
+
 export class PolicyError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly code: RefusalCode = "INVALID_POLICY") {
     super(message);
     this.name = "PolicyError";
   }
@@ -160,31 +176,31 @@ function fill(s: string, value: string): string {
  */
 export function buildRequest(req: AgentRequest, policy: SecretPolicy): BuiltRequest {
   const method = (req.method || "GET").toUpperCase();
-  if (!METHODS.has(method)) throw new PolicyError(`Method ${method} is not allowed.`);
+  if (!METHODS.has(method)) throw new PolicyError(`Method ${method} is not allowed.`, "METHOD_NOT_ALLOWED");
 
   let url: URL;
   try {
     url = new URL(req.url);
   } catch {
-    throw new PolicyError(`Invalid URL "${req.url}".`);
+    throw new PolicyError(`Invalid URL "${req.url}".`, "INVALID_URL");
   }
-  if (url.protocol !== "https:") throw new PolicyError("Only https:// URLs are allowed.");
-  if (url.username || url.password) throw new PolicyError("Credentials in the URL are not allowed.");
-  if (url.port && url.port !== "443") throw new PolicyError("Custom ports are not allowed.");
+  if (url.protocol !== "https:") throw new PolicyError("Only https:// URLs are allowed.", "HTTPS_REQUIRED");
+  if (url.username || url.password) throw new PolicyError("Credentials in the URL are not allowed.", "CREDENTIALS_IN_URL");
+  if (url.port && url.port !== "443") throw new PolicyError("Custom ports are not allowed.", "PORT_NOT_ALLOWED");
   if (url.hostname.includes(PLACEHOLDER) || req.url.split("?")[0].includes(PLACEHOLDER)) {
     // Placeholders in scheme/host/path would let the value leak into DNS, proxies and logs.
-    throw new PolicyError(`${PLACEHOLDER} is only allowed in headers, query values and the body.`);
+    throw new PolicyError(`${PLACEHOLDER} is only allowed in headers, query values and the body.`, "PLACEHOLDER_POSITION");
   }
   const host = url.hostname.toLowerCase();
   if (!policy.hosts.includes(host)) {
-    throw new PolicyError(`Host "${host}" is not on this secret's allow-list (${policy.hosts.join(", ")}).`);
+    throw new PolicyError(`Host "${host}" is not on this secret's allow-list (${policy.hosts.join(", ")}).`, "HOST_NOT_ALLOWED");
   }
   if (policy.allow && policy.allow.length > 0) {
     // url.pathname is already dot-segment-normalised by the URL parser. Encoded slashes/backslashes could be
     // decoded differently by the server, so they are refused when path rules are active.
-    if (/%2f|%5c|\\/i.test(url.pathname)) throw new PolicyError("Encoded slashes are not allowed in the path when method/path rules are set.");
+    if (/%2f|%5c|\\/i.test(url.pathname)) throw new PolicyError("Encoded slashes are not allowed in the path when method/path rules are set.", "ENCODED_SLASH");
     if (!ruleAllows(policy.allow, method, url.pathname)) {
-      throw new PolicyError(`${method} ${url.pathname} is not allowed for this secret (rules: ${policy.allow.join(", ")}).`);
+      throw new PolicyError(`${method} ${url.pathname} is not allowed for this secret (rules: ${policy.allow.join(", ")}).`, "RULE_NOT_ALLOWED");
     }
   }
 
@@ -202,9 +218,9 @@ export function buildRequest(req: AgentRequest, policy: SecretPolicy): BuiltRequ
 
   const headers: Record<string, string> = {};
   for (const [k, v] of Object.entries(req.headers ?? {})) {
-    if (!/^[A-Za-z0-9-]+$/.test(k)) throw new PolicyError(`Invalid header name "${k}".`);
+    if (!/^[A-Za-z0-9-]+$/.test(k)) throw new PolicyError(`Invalid header name "${k}".`, "INVALID_HEADER");
     const val = String(v);
-    if (/[\r\n]/.test(val)) throw new PolicyError(`Header "${k}" contains a line break.`);
+    if (/[\r\n]/.test(val)) throw new PolicyError(`Header "${k}" contains a line break.`, "INVALID_HEADER");
     if (val.includes(PLACEHOLDER)) {
       headers[k] = fill(val, policy.value);
       injectedInto.push(`header:${k}`);
@@ -231,6 +247,7 @@ export function buildRequest(req: AgentRequest, policy: SecretPolicy): BuiltRequ
     } else {
       throw new PolicyError(
         `Nowhere to put the secret. Use ${PLACEHOLDER} in a header, query value or the body, or store the secret with a default header/query.`,
+        "NO_INJECTION_TARGET",
       );
     }
   }
@@ -238,7 +255,7 @@ export function buildRequest(req: AgentRequest, policy: SecretPolicy): BuiltRequ
   const search = params.toString();
   url.search = search ? `?${search}` : "";
   if ((method === "GET" || method === "HEAD") && body !== undefined && body !== "") {
-    throw new PolicyError(`${method} requests cannot have a body.`);
+    throw new PolicyError(`${method} requests cannot have a body.`, "BODY_NOT_ALLOWED");
   }
   return { method, url: url.toString(), headers, body, host, injectedInto };
 }
@@ -254,11 +271,19 @@ export function secretVariants(value: string): string[] {
 
 /** Replace every occurrence of the secret (and its encodings) with a marker. */
 export function redact(text: string, value: string, name: string): string {
+  return redactCount(text, value, name).text;
+}
+
+/** Like redact(), but also reports how many occurrences were replaced (for the receipt). */
+export function redactCount(text: string, value: string, name: string): { text: string; count: number } {
   let out = text;
+  let count = 0;
   for (const variant of secretVariants(value)) {
-    out = out.split(variant).join(`[REDACTED:${name}]`);
+    const parts = out.split(variant);
+    count += parts.length - 1;
+    out = parts.join(`[REDACTED:${name}]`);
   }
-  return out;
+  return { text: out, count };
 }
 
 /** Response headers worth showing the agent (cookies and auth echoes are dropped). */
