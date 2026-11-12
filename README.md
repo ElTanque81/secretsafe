@@ -129,6 +129,16 @@ secretsafe login | init | add | scan | import | list | remove | status | audit |
 - **Exfiltration control:** exact-host allow-list per secret, https only, port 443 only, no userinfo, redirects never followed, placeholder forbidden in host/path, CR/LF header injection blocked.
 - **Redaction:** raw, URL-encoded, base64 and base64url echoes of the key are replaced in body, headers and error messages. `Set-Cookie` and other sensitive response headers are dropped.
 - **Audit:** every use (ok / denied / error) is appended to `~/.secretsafe/audit.jsonl` — without the value.
+- **Receipts:** every `secure_request` returns a receipt the agent can act on without seeing the key:
+
+```json
+{ "request_id": "4c680cc4-…", "tool_call_id": "1", "secret": "demo", "host": "webhook.site", "path": "/x",
+  "decision": "refused", "injected_into": [], "redactions": 0, "status": null,
+  "refusal_code": "HOST_NOT_ALLOWED", "refusal_reason": "Host \"webhook.site\" is not on this secret's allow-list (httpbin.org).",
+  "retryable": false }
+```
+
+  `decision` is `sent` / `refused` / `error`. Refusal codes: `HOST_NOT_ALLOWED`, `RULE_NOT_ALLOWED`, `METHOD_NOT_ALLOWED`, `HTTPS_REQUIRED`, `PORT_NOT_ALLOWED`, `PLACEHOLDER_POSITION`, `ENCODED_SLASH`, `INVALID_URL`, `INVALID_HEADER`, `BODY_NOT_ALLOWED`, `NO_INJECTION_TARGET`, `UNKNOWN_SECRET`, `UPSTREAM_AUTH_FAILED` (401/403), `TIMEOUT`, `NETWORK_ERROR`, `VAULT_ERROR`. `retryable` is true only for timeouts, 429 and 5xx. The same fields go into the audit log.
 
 **Not (yet) protected:**
 - The SecretSafe process on your machine briefly holds the key in memory to make the request. Malware on your machine could read it. *Roadmap:* move the outbound call itself into a T3N TEE contract with `contract_allowlist` + agent egress, so the value never leaves the enclave.

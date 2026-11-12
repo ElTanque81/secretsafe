@@ -73,6 +73,15 @@ Gemini (key as query parameter):
 
 More templates: `reference/api-templates.md`.
 
+## Reading the receipt
+
+Every `secure_request` result has a `receipt`:
+- `decision: "sent"` → the request went out with the key; check `status`. `redactions > 0` means the API echoed the key and SecretSafe scrubbed it.
+- `decision: "refused"` → the key was never used. Use `refusal_code`: `HOST_NOT_ALLOWED` / `RULE_NOT_ALLOWED` → do not retry, tell the user what was blocked; `PLACEHOLDER_POSITION`, `INVALID_URL`, `BODY_NOT_ALLOWED`, `NO_INJECTION_TARGET` → fix your request and try again.
+- `refusal_code: "UPSTREAM_AUTH_FAILED"` → the API rejected the key (401/403): suggest rotating it.
+- Retry the same request only if `retryable` is `true` (timeouts, 429, 5xx), with a short back-off.
+- Quote `request_id` when reporting a problem; it matches the user's audit log.
+
 ## When a secret is missing
 
 If `list_secrets` has no secret for the needed host, **do not ask for the key**. Tell the user to add it themselves in their terminal (the value is read hidden, never via chat):
