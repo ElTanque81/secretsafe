@@ -54,6 +54,8 @@ secretsafe add gemini --host generativelanguage.googleapis.com --query key
 secretsafe add github-ro --host api.github.com --header "Authorization: Bearer {{secret}}" \
   --allow "GET|HEAD /user" --allow "GET /user/repos" --allow "GET /repos/**"
 # shortcut for any GET/HEAD: --read-only
+# allow {{secret}} in the request body (off by default, only for APIs that need it):
+secretsafe add someapi --host api.someapi.com --placement header,query,body
 # or pipe it:  pbpaste | secretsafe add stripe --host api.stripe.com --header "Authorization: Bearer {{secret}}"
 ```
 
@@ -110,7 +112,7 @@ Opens a pre-filled GitHub issue containing **only public identifiers** (your `di
 | Tool | What it does |
 |---|---|
 | `list_secrets` | Names, allowed hosts and default injection of your secrets. **Never values.** |
-| `secure_request` | HTTPS request with `{{secret}}` placed in a header, query value or body (or default injection). Denied unless the host is allow-listed. Response is redacted. |
+| `secure_request` | HTTPS request with `{{secret}}` placed in a header or query value (body only if the secret allows it), or default injection. Denied unless the host is allow-listed. Response is redacted. |
 | `vault_status` | Your `did:t3n`, vault org and remaining T3 credits. |
 
 ## CLI
@@ -126,6 +128,7 @@ secretsafe login | init | add | scan | import | list | remove | status | audit |
 - The key is stored encrypted in T3N, readable only by your `did:t3n` (reader/manager ACL = your DID).
 - The key **never enters the agent's context**: tools return names and redacted responses only.
 - **Least privilege per request:** optional method/path rules per secret, e.g. `--allow "GET /repos/**"` or `--read-only`. Even if the stored token can write, the agent can only make the requests you allowed.
+- **Placement control:** the agent may put `{{secret}}` only where the owner allows it (`--placement header,query,body`). Default: header and query, **no body**. A secret in a request body can be *stored* by the API (e.g. a prompt-injected `POST /gists` with the key as content); response redaction would not help there.
 - **Exfiltration control:** exact-host allow-list per secret, https only, port 443 only, no userinfo, redirects never followed, placeholder forbidden in host/path, CR/LF header injection blocked.
 - **Redaction:** raw, URL-encoded, base64 and base64url echoes of the key are replaced in body, headers and error messages. `Set-Cookie` and other sensitive response headers are dropped.
 - **Audit:** every use (ok / denied / error) is appended to `~/.secretsafe/audit.jsonl` — without the value.
@@ -138,11 +141,12 @@ secretsafe login | init | add | scan | import | list | remove | status | audit |
   "retryable": false }
 ```
 
-  `decision` is `sent` / `refused` / `error`. Refusal codes: `HOST_NOT_ALLOWED`, `RULE_NOT_ALLOWED`, `METHOD_NOT_ALLOWED`, `HTTPS_REQUIRED`, `PORT_NOT_ALLOWED`, `PLACEHOLDER_POSITION`, `ENCODED_SLASH`, `INVALID_URL`, `INVALID_HEADER`, `BODY_NOT_ALLOWED`, `NO_INJECTION_TARGET`, `UNKNOWN_SECRET`, `UPSTREAM_AUTH_FAILED` (401/403), `TIMEOUT`, `NETWORK_ERROR`, `VAULT_ERROR`. `retryable` is true only for timeouts, 429 and 5xx. The same fields go into the audit log.
+  `decision` is `sent` / `refused` / `error`. Refusal codes: `HOST_NOT_ALLOWED`, `RULE_NOT_ALLOWED`, `METHOD_NOT_ALLOWED`, `HTTPS_REQUIRED`, `PORT_NOT_ALLOWED`, `PLACEHOLDER_POSITION`, `PLACEMENT_NOT_ALLOWED`, `ENCODED_SLASH`, `INVALID_URL`, `INVALID_HEADER`, `BODY_NOT_ALLOWED`, `NO_INJECTION_TARGET`, `UNKNOWN_SECRET`, `UPSTREAM_AUTH_FAILED` (401/403), `TIMEOUT`, `NETWORK_ERROR`, `VAULT_ERROR`. `retryable` is true only for timeouts, 429 and 5xx. The same fields go into the audit log.
 
 **Not (yet) protected:**
 - The SecretSafe process on your machine briefly holds the key in memory to make the request. Malware on your machine could read it. *Roadmap:* move the outbound call itself into a T3N TEE contract with `contract_allowlist` + agent egress, so the value never leaves the enclave.
-- An allowed host is trusted. If you allow `api.example.com` without method/path rules, an agent can send *that* host anything. Add `--allow` rules or `--read-only` to narrow it down.
+- An allowed host is trusted. If you allow `api.example.com` without method/path rules, an agent can send *that* host anything. Add `--allow` rules or `--read-only` to narrow it down. `list_secrets` and `secretsafe list` flag secrets without rules.
+- Header and query placement stay on by default. An API that stores a request header or query value could still keep the key; for maximum strictness use rules plus the default injection only.
 
 ## Roadmap
 

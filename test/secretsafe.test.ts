@@ -14,7 +14,8 @@ test("default header injection", () => {
   assert.deepEqual(r.injectedInto, ["header:Authorization"]);
 });
 
-test("explicit placeholder in header, query and body", () => {
+test("explicit placeholder in header, query and body (body explicitly allowed)", () => {
+  const withBody = validatePolicy({ ...policy, placement: ["header", "query", "body"] });
   const r = buildRequest(
     {
       method: "POST",
@@ -22,7 +23,7 @@ test("explicit placeholder in header, query and body", () => {
       headers: { "x-api-key": "{{secret}}" },
       body: '{"token":"{{secret}}"}',
     },
-    policy,
+    withBody,
   );
   assert.equal(r.headers["x-api-key"], KEY);
   assert.ok(r.url.includes(encodeURIComponent(KEY)));

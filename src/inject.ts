@@ -26,6 +26,22 @@ export interface SecretPolicy {
    * method `*` = any method. Absent/empty = any method and path on the allowed hosts.
    */
   allow?: string[];
+  /**
+   * Where the agent may put {{secret}} itself: any of "header", "query", "body".
+   * Absent = ["header", "query"]: body placement is off unless the owner turns it on, because a
+   * secret in a request body can be stored by the API (e.g. a public gist) even though the response is redacted.
+   * The owner-defined default injection (header/query template) is always allowed.
+   */
+  placement?: Placement[];
+}
+
+export type Placement = "header" | "query" | "body";
+export const PLACEMENTS: Placement[] = ["header", "query", "body"];
+export const DEFAULT_PLACEMENT: Placement[] = ["header", "query"];
+
+/** Where the agent may place {{secret}} for this secret (falls back to the safe default). */
+export function placementOf(p: SecretPolicy): Placement[] {
+  return p.placement ?? DEFAULT_PLACEMENT;
 }
 
 export interface AgentRequest {
@@ -55,6 +71,7 @@ export type RefusalCode =
   | "PORT_NOT_ALLOWED"
   | "CREDENTIALS_IN_URL"
   | "PLACEHOLDER_POSITION"
+  | "PLACEMENT_NOT_ALLOWED"
   | "ENCODED_SLASH"
   | "INVALID_HEADER"
   | "BODY_NOT_ALLOWED"
@@ -163,7 +180,17 @@ export function validatePolicy(p: SecretPolicy): SecretPolicy {
     allow.forEach(parseRule);
     if (allow.length === 0) allow = undefined;
   }
-  return allow ? { ...p, hosts, allow } : { ...p, hosts };
+  let placement: Placement[] | undefined;
+  if (p.placement !== undefined) {
+    if (!Array.isArray(p.placement)) throw new PolicyError("placement must be a list of: header, query, body.");
+    const set = new Set(p.placement.map((x) => String(x).trim().toLowerCase()));
+    for (const x of set) if (!PLACEMENTS.includes(x as Placement)) throw new PolicyError(`Invalid placement "${x}". Use header, query and/or body.`);
+    placement = PLACEMENTS.filter((x) => set.has(x));
+  }
+  const out: SecretPolicy = { ...p, hosts };
+  if (allow) out.allow = allow; else delete out.allow;
+  if (placement) out.placement = placement; else delete out.placement;
+  return out;
 }
 
 function fill(s: string, value: string): string {
@@ -205,12 +232,21 @@ export function buildRequest(req: AgentRequest, policy: SecretPolicy): BuiltRequ
   }
 
   const injectedInto: string[] = [];
+  const allowed = placementOf(policy);
+  const refusePlacement = (where: Placement) => {
+    throw new PolicyError(
+      `${PLACEHOLDER} in the ${where} is not allowed for this secret (allowed: ${allowed.join(", ") || "none, default injection only"}). ` +
+        (where === "body" ? "A secret in a request body can be stored by the API. The owner can allow it with --placement body." : `The owner can allow it with --placement ${where}.`),
+      "PLACEMENT_NOT_ALLOWED",
+    );
+  };
 
   // Query: existing query values + agent-supplied query map.
   const params = new URLSearchParams(url.search);
   for (const [k, v] of Object.entries(req.query ?? {})) params.set(k, String(v));
   for (const [k, v] of [...params.entries()]) {
     if (v.includes(PLACEHOLDER)) {
+      if (!allowed.includes("query")) refusePlacement("query");
       params.set(k, fill(v, policy.value));
       injectedInto.push(`query:${k}`);
     }
@@ -222,6 +258,7 @@ export function buildRequest(req: AgentRequest, policy: SecretPolicy): BuiltRequ
     const val = String(v);
     if (/[\r\n]/.test(val)) throw new PolicyError(`Header "${k}" contains a line break.`, "INVALID_HEADER");
     if (val.includes(PLACEHOLDER)) {
+      if (!allowed.includes("header")) refusePlacement("header");
       headers[k] = fill(val, policy.value);
       injectedInto.push(`header:${k}`);
     } else {
@@ -231,6 +268,7 @@ export function buildRequest(req: AgentRequest, policy: SecretPolicy): BuiltRequ
 
   let body = req.body;
   if (body !== undefined && body.includes(PLACEHOLDER)) {
+    if (!allowed.includes("body")) refusePlacement("body");
     body = fill(body, policy.value);
     injectedInto.push("body");
   }

@@ -8,7 +8,7 @@ import { userInfo } from "node:os";
 import type { Environment } from "@terminal3/t3n-sdk";
 import { t, setLang } from "./i18n.js";
 import { loadConfig, saveConfig, readAudit, auditPath } from "./config.js";
-import { normaliseName, validatePolicy, READ_ONLY_RULES } from "./inject.js";
+import { normaliseName, validatePolicy, placementOf, READ_ONLY_RULES, type SecretPolicy } from "./inject.js";
 import { T3Vault } from "./vault.js";
 import { createServer, VERSION } from "./server.js";
 import { scanPath, extractValue, looksLikeWalletSecret, WALLET_DETECTORS } from "./scan.js";
@@ -40,6 +40,11 @@ const allowRules = (p: Parsed): string[] | undefined => {
   const rules = [...(p.flags.allow ?? [])];
   if (one(p, "read-only") !== undefined) rules.push(...READ_ONLY_RULES);
   return rules.length ? rules : undefined;
+};
+/** --placement header,query,body (comma-separated or repeatable). */
+const placementFlag = (p: Parsed): SecretPolicy["placement"] => {
+  const v = (p.flags.placement ?? []).flatMap((x) => x.split(",")).map((x) => x.trim()).filter(Boolean);
+  return v.length ? (v as SecretPolicy["placement"]) : undefined;
 };
 const err = (s: string) => process.stderr.write(s + "\n");
 const out = (s: string) => process.stdout.write(s + "\n");
@@ -170,10 +175,12 @@ async function main() {
       const w = looksLikeWalletSecret(value);
       if (w && !(w === "evm-private-key" && one(p, "not-a-wallet-key") !== undefined)) throw new Error(t("walletRefused", { kind: w }));
       const vault = await openVault(p, log);
-      const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note"), allow: allowRules(p) });
+      const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note"), allow: allowRules(p), placement: placementFlag(p) });
       await vault.put(name, policy);
       out(t("added", { name, hosts: policy.hosts.join(", ") }));
       if (policy.allow) out(t("allowedRules", { rules: policy.allow.join(", ") }));
+      else err(t("noRulesWarning"));
+      out(t("placementInfo", { where: placementOf(policy).join(", ") }));
       return;
     }
 
@@ -212,10 +219,12 @@ async function main() {
       if (WALLET_DETECTORS.has(finding.detector) || (looksLikeWalletSecret(value) && one(p, "not-a-wallet-key") === undefined)) {
         throw new Error(t("walletRefused", { kind: finding.detector }));
       }
-      const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note") ?? `imported from ${file}:${finding.line}`, allow: allowRules(p) });
+      const policy = validatePolicy({ value, hosts, header: one(p, "header"), query: one(p, "query"), note: one(p, "note") ?? `imported from ${file}:${finding.line}`, allow: allowRules(p), placement: placementFlag(p) });
       const vault = await openVault(p, log);
       await vault.put(name, policy);
       out(t("imported", { name, file, line: finding.line, fp: finding.fp, hosts: policy.hosts.join(", ") }));
+      if (!policy.allow) err(t("noRulesWarning"));
+      out(t("placementInfo", { where: placementOf(policy).join(", ") }));
       out(t("importNext", { file, line: finding.line }));
       return;
     }
@@ -228,7 +237,7 @@ async function main() {
         const rows = [];
         for (const it of items) {
           const pol = await vault.get(it.name);
-          rows.push({ name: it.name, version: it.version, updatedAt: it.updatedAt, hosts: pol.hosts, allow: pol.allow ?? ["* /**"], injection: pol.header ? `header ${pol.header.split(":")[0]}` : pol.query ? `query ${pol.query}` : "placeholder", note: pol.note ?? "" });
+          rows.push({ name: it.name, version: it.version, updatedAt: it.updatedAt, hosts: pol.hosts, allow: pol.allow ?? ["* /**"], placement: placementOf(pol), injection: pol.header ? `header ${pol.header.split(":")[0]}` : pol.query ? `query ${pol.query}` : "placeholder", note: pol.note ?? "" });
         }
         out(JSON.stringify({ did: vault.did, vault: vault.orgDid, secrets: rows }, null, 2));
         return;
@@ -237,7 +246,7 @@ async function main() {
       out(t("listHeader"));
       for (const it of items) {
         const pol = await vault.get(it.name);
-        out(`  • ${it.name.padEnd(20)} → ${pol.hosts.join(", ")}${pol.allow ? `  [${pol.allow.join(", ")}]` : ""}${pol.note ? `   (${pol.note})` : ""}`);
+        out(`  • ${it.name.padEnd(20)} → ${pol.hosts.join(", ")}${pol.allow ? `  [${pol.allow.join(", ")}]` : "  [⚠ no rules]"}  {{secret}}: ${placementOf(pol).join("/")}${pol.note ? `   (${pol.note})` : ""}`);
       }
       return;
     }

@@ -9,6 +9,7 @@ import {
   normaliseName,
   PolicyError,
   PLACEHOLDER,
+  placementOf,
   type AgentRequest,
 } from "./inject.js";
 import type { Vault } from "./vault.js";
@@ -184,7 +185,7 @@ export function createServer(deps: SecureRequestDeps): McpServer {
     {
       title: "List available secrets",
       description:
-        "List the API keys/tokens the user has stored in SecretSafe (Terminal 3 TEE vault). Returns only names, allowed hosts, allowed methods/paths and the default injection. Values are never returned. Call this first to know which secret name to use with secure_request.",
+        "List the API keys/tokens the user has stored in SecretSafe (Terminal 3 TEE vault). Returns only names, allowed hosts, allowed methods/paths, where {{secret}} may be placed and the default injection. Values are never returned. Call this first to know which secret name to use with secure_request.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
@@ -198,8 +199,10 @@ export function createServer(deps: SecureRequestDeps): McpServer {
             name: it.name,
             allowed_hosts: p.hosts,
             allowed_requests: p.allow ?? ["any method, any path"],
+            placeholder_allowed_in: placementOf(p),
             default_injection: p.header ? `header ${p.header.split(":")[0]}` : p.query ? `query ${p.query}` : `none (use ${PLACEHOLDER})`,
             note: p.note ?? "",
+            ...(p.allow ? {} : { warning: "No method/path rules: any request to the allowed hosts is possible. Owner: add --allow rules or --read-only." }),
           });
         } catch {
           out.push({ name: it.name, allowed_hosts: [], default_injection: "unreadable", note: "" });
@@ -215,7 +218,7 @@ export function createServer(deps: SecureRequestDeps): McpServer {
       title: "HTTPS request with a stored secret",
       description: [
         "Make an HTTPS request that needs one of the user's secrets WITHOUT seeing it.",
-        `Write the literal placeholder ${PLACEHOLDER} where the secret belongs (a header value, a query value or the body).`,
+        `Write the literal placeholder ${PLACEHOLDER} where the secret belongs: a header value, a query value or, only if placeholder_allowed_in (list_secrets) includes it, the body.`,
         "If you omit the placeholder, the secret's default header/query injection is used (e.g. Authorization: Bearer).",
         "The request is only sent if the URL host is on that secret's allow-list and, if the secret has method/path rules (allowed_requests in list_secrets), the method and path match one of them. Any echo of the secret in the response is replaced with [REDACTED:<name>].",
         "Every result includes a receipt (request_id, decision sent/refused/error, injected_into, redactions, refusal_code, retryable). If retryable is false, change the request or ask the user instead of retrying.",
@@ -227,7 +230,7 @@ export function createServer(deps: SecureRequestDeps): McpServer {
         url: z.string().describe("Full https:// URL. Do not put the placeholder in the host or path."),
         headers: z.record(z.string(), z.string()).optional().describe(`Request headers. Use ${PLACEHOLDER} in a value to place the secret.`),
         query: z.record(z.string(), z.string()).optional().describe("Extra query parameters (merged into the URL)."),
-        body: z.string().optional().describe("Raw request body (e.g. JSON string). May contain the placeholder."),
+        body: z.string().optional().describe("Raw request body (e.g. JSON string). May contain the placeholder only if the secret allows body placement."),
       },
       annotations: { openWorldHint: true },
     },

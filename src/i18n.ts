@@ -22,6 +22,8 @@ const en = {
   mcpConfig: "Add this to your MCP client config (Claude Desktop: claude_desktop_config.json, Cursor: ~/.cursor/mcp.json):",
   needHost: "At least one --host is required.",
   allowedRules: "Only these requests are allowed: {rules}",
+  noRulesWarning: "Warning: no --allow rules. An agent can make any request to these hosts. Consider --read-only or --allow \"GET /...\".",
+  placementInfo: "Agents may place {{secret}} in: {where} (change with --placement header,query,body).",
   walletRefused: "Refused: this looks like a wallet secret ({kind}). SecretSafe sends stored secrets to API servers, so a private key or seed phrase must never be stored here. If it is really a 64-hex API secret (not a wallet key), re-run with --not-a-wallet-key.",
   scanNone: "No secrets found in {root}.",
   scanHeader: "Found {n} possible secret(s) in {root}. Values are never shown, only a public prefix and a fingerprint:",
@@ -42,7 +44,7 @@ Usage:
   secretsafe init                         Log in with your T3 key, create your did:t3n vault
   secretsafe add <name> --host <host> [--host <host2>]
              [--header "Authorization: Bearer {{secret}}"] [--query key] [--note "..."]
-             [--allow "GET /repos/**"]... [--read-only]
+             [--allow "GET /repos/**"]... [--read-only] [--placement header,query,body]
                                           Store a secret (value is read hidden from stdin)
   secretsafe scan [path] [--json]         Find hard-coded keys (masked, never printed)
   secretsafe import <name> --file <f> --fp <fp> --host <host> [...]
@@ -80,6 +82,8 @@ const de: typeof en = {
   mcpConfig: "Füge das in die Konfiguration deines MCP-Clients ein (Claude Desktop: claude_desktop_config.json, Cursor: ~/.cursor/mcp.json):",
   needHost: "Mindestens ein --host ist nötig.",
   allowedRules: "Nur diese Anfragen sind erlaubt: {rules}",
+  noRulesWarning: "Warnung: keine --allow-Regeln. Ein Agent kann jede Anfrage an diese Hosts schicken. Besser --read-only oder --allow \"GET /...\".",
+  placementInfo: "Agents dürfen {{secret}} hier einsetzen: {where} (ändern mit --placement header,query,body).",
   walletRefused: "Abgelehnt: Das sieht nach einem Wallet-Secret aus ({kind}). SecretSafe schickt gespeicherte Secrets an API-Server, deshalb dürfen Private Keys oder Seed-Phrasen hier nie gespeichert werden. Falls es wirklich ein 64-stelliges Hex-API-Secret ist (kein Wallet-Key), mit --not-a-wallet-key erneut ausführen.",
   scanNone: "Keine Secrets in {root} gefunden.",
   scanHeader: "{n} mögliche(s) Secret(s) in {root} gefunden. Werte werden nie angezeigt, nur ein öffentlicher Präfix und ein Fingerabdruck:",
@@ -100,7 +104,7 @@ Nutzung:
   secretsafe init                         Mit T3-Key anmelden, did:t3n-Tresor anlegen
   secretsafe add <name> --host <host> [--host <host2>]
              [--header "Authorization: Bearer {{secret}}"] [--query key] [--note "..."]
-             [--allow "GET /repos/**"]... [--read-only]
+             [--allow "GET /repos/**"]... [--read-only] [--placement header,query,body]
                                           Secret speichern (Wert wird unsichtbar eingelesen)
   secretsafe scan [pfad] [--json]         Fest eingetragene Keys finden (maskiert, nie angezeigt)
   secretsafe import <name> --file <f> --fp <fp> --host <host> [...]
